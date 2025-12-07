@@ -1,0 +1,8 @@
+{
+  "name": "EtherBagua - Gesture Controlled Particles",
+  "description": "A 3D interactive Tai Chi Bagua visualization controlled by hand gestures, featuring Gemini-powered philosophical interpretations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
