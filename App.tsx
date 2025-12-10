@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { InteractionProvider } from './context/InteractionContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
@@ -23,23 +22,23 @@ const MainLayout: React.FC = () => {
             </div>
 
             {/* Top Right Menu */}
-            <div className="absolute top-4 right-4 z-50 flex gap-2">
+            <div className="absolute top-4 right-4 z-50 flex gap-2 sm:gap-4">
                  <button 
                     onClick={() => setIsAdminOpen(true)}
-                    className="p-2 bg-black/40 backdrop-blur-md border border-gray-700 rounded-lg hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-rose-400"
+                    className="p-3 sm:p-2 bg-black/40 backdrop-blur-md border border-gray-700 rounded-lg hover:bg-gray-800/50 transition-colors text-gray-400 hover:text-rose-400 active:bg-gray-700"
                     title={t('adminPanel')}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="24" height="24" sm:width="20" sm:height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 sm:w-5 sm:h-5">
                         <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                         <circle cx="12" cy="12" r="3"></circle>
                     </svg>
                 </button>
                 <button 
                     onClick={() => setIsHelpOpen(true)}
-                    className="p-2 bg-black/40 backdrop-blur-md border border-gray-700 rounded-lg hover:bg-gray-800/50 transition-colors text-gray-300"
+                    className="p-3 sm:p-2 bg-black/40 backdrop-blur-md border border-gray-700 rounded-lg hover:bg-gray-800/50 transition-colors text-gray-300 active:bg-gray-700"
                     title={t('help')}
                 >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="24" height="24" sm:width="20" sm:height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 sm:w-5 sm:h-5">
                         <circle cx="12" cy="12" r="10"></circle>
                         <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>

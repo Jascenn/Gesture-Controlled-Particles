@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useInteraction } from '../context/InteractionContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -30,25 +29,30 @@ const Oracle: React.FC = () => {
 
   return (
     <>
-      {/* Toggle Button (Visible when closed) */}
+      {/* Toggle Button (Visible when closed) - Adjusted for mobile visibility */}
       <div 
-        className={`absolute left-0 top-1/2 -translate-y-1/2 z-40 transition-all duration-500 ${!isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'}`}
+        className={`absolute z-40 transition-all duration-500 
+          bottom-20 left-1/2 -translate-x-1/2 sm:bottom-auto sm:top-1/2 sm:left-0 sm:translate-x-0 sm:-translate-y-1/2
+          ${!isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-black/40 hover:bg-indigo-900/40 text-white p-3 rounded-r-xl border border-l-0 border-gray-700 backdrop-blur-sm transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] group"
+          className="bg-black/40 hover:bg-indigo-900/40 text-white p-3 rounded-full sm:rounded-r-xl sm:rounded-l-none border border-gray-700 backdrop-blur-sm transition-all shadow-[0_0_15px_rgba(0,0,0,0.5)] group"
         >
-          <span className="block text-xl group-hover:translate-x-0.5 transition-transform">›</span>
+          <span className="block text-xl group-hover:-translate-y-0.5 sm:group-hover:translate-x-0.5 sm:group-hover:translate-y-0 transition-transform rotate-90 sm:rotate-0">›</span>
         </button>
       </div>
 
-      {/* Main Oracle Panel */}
+      {/* Main Oracle Panel - Responsive Positioning */}
       <div 
-        className={`absolute left-4 top-1/2 -translate-y-1/2 w-80 max-w-[calc(100vw-2rem)] transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) z-40 ${
-          isOpen ? 'translate-x-0 opacity-100' : '-translate-x-[120%] opacity-0'
-        }`}
+        className={`absolute z-40 transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
+          bottom-0 left-0 w-full rounded-t-2xl sm:rounded-t-none sm:rounded-2xl
+          sm:top-1/2 sm:left-4 sm:w-80 sm:-translate-y-1/2
+          max-h-[80vh] sm:max-h-none overflow-y-auto
+          ${isOpen ? 'translate-y-0 sm:translate-x-0 opacity-100' : 'translate-y-full sm:translate-y-[-50%] sm:-translate-x-[120%] opacity-0'}
+        `}
       >
-        <div className="bg-[#0a0a0a]/80 backdrop-blur-xl border border-gray-800 p-6 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] relative overflow-hidden">
+        <div className="bg-[#0a0a0a]/90 backdrop-blur-xl border-t sm:border border-gray-800 p-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative overflow-hidden sm:rounded-2xl">
           
           {/* Background Effects */}
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 pointer-events-none" />
@@ -57,10 +61,10 @@ const Oracle: React.FC = () => {
           {/* Close Button */}
           <button 
             onClick={() => setIsOpen(false)}
-            className="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors p-1 rounded-full hover:bg-white/5"
+            className="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors p-2 rounded-full hover:bg-white/5"
             aria-label="Close Oracle"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>

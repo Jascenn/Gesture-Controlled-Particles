@@ -6,93 +6,176 @@ import { useInteraction } from '../context/InteractionContext';
 import { HandGesture, TRIGRAMS } from '../types';
 import { generateBaguaPoints } from '../utils/particleGeometry';
 
-// --- Sound Generators ---
-const audioCtxRef = { current: null as AudioContext | null };
+// --- Sound Engine ---
+// Singleton context to prevent multiple audio contexts on remounts
+const audioContextRef = { current: null as AudioContext | null };
+
 const getAudioContext = () => {
-    if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!audioContextRef.current) {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        audioContextRef.current = new AudioContextClass();
     }
-    return audioCtxRef.current;
+    return audioContextRef.current;
 };
 
-const playGestureSound = (type: 'expand' | 'focus' | 'wind' | 'click') => {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === 'suspended') ctx.resume();
-
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    if (type === 'expand') {
-        osc.type = 'sine';
-        const freq = [523.25, 659.25, 783.99, 1046.50][Math.floor(Math.random() * 4)];
-        osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.1, now + 0.1);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
-        osc.start();
-        osc.stop(now + 2.0);
-    } else if (type === 'focus') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(55, now);
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(200, now);
-        osc.disconnect();
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.15, now + 0.5);
-        gain.gain.linearRampToValueAtTime(0, now + 1.5);
-        osc.start();
-        osc.stop(now + 1.5);
-    } else if (type === 'click') {
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(200, now);
-        osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-        osc.start();
-        osc.stop(now + 0.05);
-    } else if (type === 'wind') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(200, now);
-        const lfo = ctx.createOscillator();
-        lfo.type = 'triangle';
-        lfo.frequency.value = 50;
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 500;
-        lfo.connect(lfoGain);
-        lfoGain.connect(osc.frequency);
-        lfo.start();
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.05, now + 0.2);
-        gain.gain.linearRampToValueAtTime(0, now + 0.5);
-        osc.start();
-        osc.stop(now + 0.5);
-        lfo.stop(now + 0.5);
-    }
-};
-
-const AmbientSound = () => {
+const SpatialAudioFeedback = () => {
     const { handState } = useInteraction();
-    const { detected, gesture } = handState;
-    const prevGesture = useRef(HandGesture.NONE);
+    const pannerRef = useRef<StereoPannerNode | null>(null);
+    const masterGainRef = useRef<GainNode | null>(null);
+    
+    // Continuous Voices
+    const droneOscRef = useRef<OscillatorNode | null>(null);
+    const droneGainRef = useRef<GainNode | null>(null);
+    const droneFilterRef = useRef<BiquadFilterNode | null>(null);
+    
+    // State tracking for one-shots
+    const prevGestureRef = useRef(HandGesture.NONE);
+    const hasInteractedRef = useRef(false);
 
+    // Initialize Audio Graph
     useEffect(() => {
-        if (!detected) return;
-        if (gesture !== prevGesture.current) {
-            if (gesture === HandGesture.OPEN_PALM) playGestureSound('expand');
-            else if (gesture === HandGesture.CLOSED_FIST) playGestureSound('focus');
-            else if (gesture === HandGesture.POINTING) playGestureSound('wind');
-            else if (gesture === HandGesture.PINCH) playGestureSound('click');
+        const ctx = getAudioContext();
+        if (!ctx) return;
+
+        // Master Graph: Source -> Filter -> Gain -> Panner -> Destination
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = 0.4; // Global limit
+        masterGainRef.current = masterGain;
+
+        const panner = ctx.createStereoPanner();
+        pannerRef.current = panner;
+
+        masterGain.connect(ctx.destination);
+        panner.connect(masterGain);
+
+        // --- Drone Voice (Continuous) ---
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        const filter = ctx.createBiquadFilter();
+
+        osc.type = 'sine';
+        osc.frequency.value = 150; // Base freq
+        oscGain.gain.value = 0; // Start silent
+        filter.type = 'lowpass';
+        filter.frequency.value = 800;
+        filter.Q.value = 1;
+
+        osc.connect(filter);
+        filter.connect(oscGain);
+        oscGain.connect(panner);
+        
+        osc.start();
+
+        droneOscRef.current = osc;
+        droneGainRef.current = oscGain;
+        droneFilterRef.current = filter;
+
+        // Cleanup: We don't close the context (singleton), but we mute the gain
+        return () => {
+            if (oscGain) oscGain.gain.value = 0;
+            // Don't stop oscillator to allow component remounting without rebuilding everything
+        };
+    }, []);
+
+    // Frame Loop for Modulation
+    useFrame(() => {
+        const ctx = getAudioContext();
+        if (!ctx || !pannerRef.current || !droneOscRef.current || !droneGainRef.current || !droneFilterRef.current) return;
+        
+        const now = ctx.currentTime;
+        const { detected, x, y, gesture } = handState;
+
+        // Attempt to resume context on first detection/interaction
+        if (detected && !hasInteractedRef.current && ctx.state === 'suspended') {
+            ctx.resume().then(() => { hasInteractedRef.current = true; });
         }
-        prevGesture.current = gesture;
-    }, [gesture, detected]);
+
+        // --- Spatial Panning ---
+        // Map Hand X (0..1) to Pan (-1..1)
+        // Invert X for mirror effect if needed, but usually Left Hand = Left Speaker
+        const targetPan = Math.max(-1, Math.min(1, (x - 0.5) * 1.8));
+        pannerRef.current.pan.setTargetAtTime(targetPan, now, 0.1);
+
+        // --- Dynamic Modulation ---
+        let targetFreq = 0;
+        let targetVol = 0;
+        let targetFilterFreq = 100;
+        let targetQ = 1;
+
+        if (detected) {
+            // Modulate pitch based on Hand Y (Height)
+            // Higher hand = Higher pitch
+            const heightMod = y * 1.5; 
+
+            if (gesture === HandGesture.OPEN_PALM) {
+                // EXPAND: Ethereal, shimmering, high frequency
+                targetVol = 0.3;
+                targetFreq = 220 * (1 + heightMod); // A3 base
+                targetFilterFreq = 2500;
+                targetQ = 2; // Resonant
+                
+            } else if (gesture === HandGesture.CLOSED_FIST) {
+                // FOCUS: Deep, sub-bass, compressed
+                targetVol = 0.5;
+                targetFreq = 55 * (1 + heightMod * 0.2); // A1 base
+                targetFilterFreq = 150; // Muffled
+                targetQ = 5; // Deep resonance
+                
+            } else if (gesture === HandGesture.POINTING) {
+                // SWIRL/WIND: Mid-range, airy
+                targetVol = 0.25;
+                targetFreq = 110 * (1 + heightMod); 
+                targetFilterFreq = 800 + Math.sin(now * 10) * 200; // Flutter effect
+                targetQ = 0.5;
+                
+            } else if (gesture === HandGesture.PINCH) {
+                // PINCH: Handled as one-shot, but quiet the drone
+                targetVol = 0.05;
+                targetFreq = 440;
+                targetFilterFreq = 1000;
+
+            } else {
+                // IDLE Detected: Very subtle hum
+                targetVol = 0.02;
+                targetFreq = 80;
+                targetFilterFreq = 100;
+            }
+        } else {
+            // Not detected
+            targetVol = 0;
+        }
+
+        // Apply seamless transitions
+        droneOscRef.current.frequency.setTargetAtTime(targetFreq, now, 0.2);
+        droneGainRef.current.gain.setTargetAtTime(targetVol, now, 0.4);
+        droneFilterRef.current.frequency.setTargetAtTime(targetFilterFreq, now, 0.3);
+        droneFilterRef.current.Q.setTargetAtTime(targetQ, now, 0.3);
+
+        // --- One-Shot Triggers ---
+        if (gesture === HandGesture.PINCH && prevGestureRef.current !== HandGesture.PINCH) {
+            triggerPinchSound(ctx, pannerRef.current);
+        }
+        
+        prevGestureRef.current = gesture;
+    });
+
+    const triggerPinchSound = (ctx: AudioContext, dest: AudioNode) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1500, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.15);
+        
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        
+        osc.connect(gain);
+        gain.connect(dest);
+        
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    };
 
     return null;
 };
@@ -141,7 +224,7 @@ const ComboBurst = () => {
             startTimeRef.current = time;
             meshRef.current.visible = true;
             meshRef.current.rotation.z = Math.random() * Math.PI;
-            playGestureSound('focus'); 
+            // Sound is now handled by SpatialAudioFeedback or distinct trigger if needed
         }
 
         const elapsed = time - startTimeRef.current;
@@ -200,8 +283,12 @@ const BaguaParticles = () => {
   const { handState, activeTrigramIndex, setActiveTrigramIndex, lastComboTime, lastAuraTime } = useInteraction();
   const { viewport } = useThree();
   
+  // Mobile Optimization: Reduce particle count for performance
+  const isMobile = window.innerWidth < 768;
+  const particleCount = isMobile ? 3500 : 7000;
+
   // Use extracted geometry generator
-  const { positions, colors, sizes, hammerSickleTargets, loveTargets, shakaTargets, portalTargets, starTargets, moonTargets, chaosTargets, vortexTargets, sphereTargets, merkabaTargets, gridTargets, yinYangTargets, realCount } = useMemo(() => generateBaguaPoints(7000), []);
+  const { positions, colors, sizes, hammerSickleTargets, loveTargets, shakaTargets, portalTargets, starTargets, moonTargets, chaosTargets, vortexTargets, sphereTargets, merkabaTargets, gridTargets, yinYangTargets, realCount } = useMemo(() => generateBaguaPoints(particleCount), [particleCount]);
   
   const currentPositions = useRef(positions.slice());
   const simulationRef = useRef({ density: 1.0 });
@@ -212,14 +299,14 @@ const BaguaParticles = () => {
   const prevGestureRef = useRef(HandGesture.NONE);
 
   const uniforms = useMemo(() => ({
-    pixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+    pixelRatio: { value: Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2) },
     uSize: { value: 15.0 },
     uOverrideColor: { value: new THREE.Color(0, 0, 0) },
     uMixFactor: { value: 0.0 },
     uTime: { value: 0 },
     uComboTriggerTime: { value: -999.0 },
     uAuraTriggerTime: { value: -999.0 }
-  }), []);
+  }), [isMobile]);
 
   const activeTrigram = TRIGRAMS[activeTrigramIndex % 8] || TRIGRAMS[0];
 
@@ -263,7 +350,6 @@ const BaguaParticles = () => {
 
     // 2. Rotation Logic (Pinch Cycle)
     if (detected && gesture === HandGesture.PINCH && prevGestureRef.current !== HandGesture.PINCH) {
-         playGestureSound('click');
          const segment = Math.PI / 4;
          rotationSnapRef.current = pointsRef.current.rotation.z - segment; 
     }
@@ -526,7 +612,7 @@ const Scene = () => {
             <ambientLight intensity={0.5} />
             <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
             <CameraHandler />
-            <AmbientSound />
+            <SpatialAudioFeedback />
             <CentralStatus />
             <BaguaParticles />
             <TrailEffect />

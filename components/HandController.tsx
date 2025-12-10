@@ -260,7 +260,8 @@ const HandController: React.FC = () => {
   
   // UI State for Window Management
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [position, setPosition] = useState({ x: window.innerWidth - 340, y: 20 });
+  // Default to bottom right on desktop, adjust dynamically in effect
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
 
@@ -300,6 +301,19 @@ const HandController: React.FC = () => {
   const sensitivityRef = useRef(1.0);
   const [sensitivity, setSensitivity] = useState(1.0);
 
+  // Initialize Position based on screen size
+  useEffect(() => {
+    const isMobile = window.innerWidth < 640;
+    if (isMobile) {
+        // Bottom sheet style for mobile default
+        setPosition({ x: 16, y: window.innerHeight - 80 }); 
+        setIsCollapsed(true);
+    } else {
+        // Top right-ish for desktop
+        setPosition({ x: window.innerWidth - 340, y: 20 });
+    }
+  }, []);
+
   // --- Sequence Detection ---
   useEffect(() => {
     const current = handState.gesture;
@@ -338,7 +352,7 @@ const HandController: React.FC = () => {
   }, [handState.gesture, handState.detected, triggerCombo, triggerAura]);
 
 
-  // --- Drag & Drop Logic ---
+  // --- Drag & Drop Logic (Mouse) ---
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
@@ -350,56 +364,54 @@ const HandController: React.FC = () => {
     };
   };
 
+  // --- Drag & Drop Logic (Touch) ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.tagName === 'INPUT' || target.tagName === 'SELECT') return;
+
+      const touch = e.touches[0];
+      setIsDragging(true);
+      dragOffset.current = {
+          x: touch.clientX - position.x,
+          y: touch.clientY - position.y
+      };
+  };
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging) return;
-      setPosition({
-        x: e.clientX - dragOffset.current.x,
-        y: e.clientY - dragOffset.current.y
-      });
+      const newX = Math.min(Math.max(0, e.clientX - dragOffset.current.x), window.innerWidth - 50);
+      const newY = Math.min(Math.max(0, e.clientY - dragOffset.current.y), window.innerHeight - 50);
+      setPosition({ x: newX, y: newY });
     };
 
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+        if (!isDragging) return;
+        const touch = e.touches[0];
+        const newX = Math.min(Math.max(0, touch.clientX - dragOffset.current.x), window.innerWidth - 50);
+        const newY = Math.min(Math.max(0, touch.clientY - dragOffset.current.y), window.innerHeight - 50);
+        setPosition({ x: newX, y: newY });
+    };
+
+    const handleEnd = () => {
       setIsDragging(false);
     };
 
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('mouseup', handleEnd);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleEnd);
     }
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
     };
   }, [isDragging]);
 
-  useEffect(() => {
-    setPosition({ x: window.innerWidth - 340, y: 20 });
-  }, []);
-
-  // Video Control Handlers
-  const togglePlayPause = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPaused(false);
-      } else {
-        videoRef.current.pause();
-        setIsPaused(true);
-      }
-    }
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.stopPropagation();
-    const newVol = parseFloat(e.target.value);
-    setVolume(newVol);
-    if (videoRef.current) {
-      videoRef.current.volume = newVol;
-    }
-  };
 
   // Hand Processing Callback
   const onResults = useCallback((results: any) => {
@@ -639,6 +651,8 @@ const HandController: React.FC = () => {
                 width: { ideal: 640 },
                 height: { ideal: 480 }
             } : {
+                // Mobile optimization: Prefer front-facing camera
+                facingMode: 'user', 
                 width: { ideal: 640 },
                 height: { ideal: 480 }
             }
@@ -751,6 +765,8 @@ const HandController: React.FC = () => {
         },
       });
 
+      // Mobile Optimization: Use lite complexity if needed, but modern phones handle full well.
+      // Keeping it 1 for accuracy, but users can lower if laggy (future feature).
       hands.setOptions({
         maxNumHands: 1,
         modelComplexity: 1, 
@@ -857,19 +873,24 @@ const HandController: React.FC = () => {
                 </div>
             </div>
 
-            {/* Draggable Control Panel */}
+            {/* Draggable Control Panel - Responsive Width */}
             <div 
                 style={{ 
                     left: position.x, 
                     top: position.y,
-                    transform: isCollapsed ? 'translate(calc(100% - 40px), 0)' : 'none'
+                    // If collapsed on mobile, standard transform might move it offscreen differently
+                    // Simplified collapse logic for responsiveness
+                    transform: isCollapsed 
+                        ? (window.innerWidth < 640 ? 'translate(0, calc(100% - 48px))' : 'translate(calc(100% - 40px), 0)')
+                        : 'none'
                 }}
-                className={`fixed z-40 ${cameraError ? 'w-[22rem]' : 'w-80'} bg-[#0f172a]/90 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${isDragging ? 'cursor-grabbing' : ''}`}
+                className={`fixed z-40 ${cameraError ? 'w-[90vw] sm:w-[22rem]' : 'w-[90vw] sm:w-80'} bg-[#0f172a]/90 backdrop-blur-md border border-gray-700 rounded-xl shadow-2xl transition-all duration-300 overflow-hidden flex flex-col ${isDragging ? 'cursor-grabbing' : ''}`}
             >
                 {/* Header / Drag Handle */}
                 <div 
                     onMouseDown={handleMouseDown}
-                    className="h-10 bg-white/5 border-b border-white/5 flex items-center justify-between px-3 cursor-grab hover:bg-white/10 transition-colors select-none"
+                    onTouchStart={handleTouchStart}
+                    className="h-12 sm:h-10 bg-white/5 border-b border-white/5 flex items-center justify-between px-3 cursor-grab hover:bg-white/10 transition-colors select-none touch-none"
                 >
                     <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full ${handState.detected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
@@ -879,9 +900,9 @@ const HandController: React.FC = () => {
                     </div>
                     <button 
                         onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="text-gray-400 hover:text-white p-1"
+                        className="text-gray-400 hover:text-white p-2"
                     >
-                        {isCollapsed ? '←' : '−'}
+                        {isCollapsed ? (window.innerWidth < 640 ? '↑' : '←') : '−'}
                     </button>
                 </div>
 
@@ -889,7 +910,7 @@ const HandController: React.FC = () => {
                 {!isCollapsed && (
                     <div className="p-4 space-y-4">
                         {/* Camera Preview / Visualizer */}
-                        <div className={`relative ${cameraError ? 'h-80' : 'h-48'} bg-black rounded-lg overflow-hidden border border-gray-800 group transition-all duration-300`}>
+                        <div className={`relative ${cameraError ? 'h-64 sm:h-80' : 'h-48'} bg-black rounded-lg overflow-hidden border border-gray-800 group transition-all duration-300`}>
                             <video 
                                 ref={videoRef}
                                 className="absolute inset-0 w-full h-full object-cover opacity-30 grayscale group-hover:opacity-50 transition-opacity"
@@ -923,20 +944,6 @@ const HandController: React.FC = () => {
                                             ? "To enable gesture control, please grant camera permissions:" 
                                             : "Unable to connect to video feed. Please try the following:"}
                                     </p>
-                                    <ol className="text-[10px] text-gray-500 text-left space-y-2 mb-5 w-full bg-white/5 p-3 rounded border border-white/5">
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-4 h-4 flex items-center justify-center bg-gray-700 rounded-full text-[8px]">1</span>
-                                            Click the 🔒 or 🎥 icon in the address bar
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-4 h-4 flex items-center justify-center bg-gray-700 rounded-full text-[8px]">2</span>
-                                            Set "Camera" to <strong>Allow</strong>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <span className="w-4 h-4 flex items-center justify-center bg-gray-700 rounded-full text-[8px]">3</span>
-                                            Refresh the page
-                                        </li>
-                                    </ol>
                                     <button 
                                         onClick={() => startCamera()}
                                         className="w-full py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white text-xs font-bold uppercase tracking-wider rounded hover:from-red-500 hover:to-rose-500 transition-all"
