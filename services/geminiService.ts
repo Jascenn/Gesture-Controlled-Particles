@@ -1,11 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { TrigramInfo } from "../types";
 
-// Initialize Gemini
-// Note: API_KEY must be provided via environment variable.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = process.env.API_KEY?.trim();
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const getTrigramInterpretation = async (trigram: TrigramInfo): Promise<string> => {
+  if (!ai) {
+    return "The oracle is quiet until a Gemini API key is configured.";
+  }
+
   try {
     const modelId = "gemini-2.5-flash";
     const prompt = `

@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a reproducible problem
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Remove API keys, camera images, and
+        personal information before posting logs or screenshots.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open...
+        2. Allow camera access...
+        3. Perform...
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, operating system, camera, and Node.js version
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Remove sensitive information first.
+    validations:
+      required: false
