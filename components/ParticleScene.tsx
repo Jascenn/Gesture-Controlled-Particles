@@ -529,9 +529,9 @@ const BaguaParticles = () => {
     <group>
       <points ref={pointsRef}>
         <bufferGeometry>
-          <bufferAttribute attach="attributes-position" count={realCount} array={currentPositions.current} itemSize={3} />
-          <bufferAttribute attach="attributes-color" count={colors.length / 3} array={colors} itemSize={3} />
-          <bufferAttribute attach="attributes-size" count={sizes.length} array={sizes} itemSize={1} />
+          <bufferAttribute attach="attributes-position" args={[currentPositions.current, 3]} />
+          <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+          <bufferAttribute attach="attributes-size" args={[sizes, 1]} />
         </bufferGeometry>
         <shaderMaterial
           transparent
