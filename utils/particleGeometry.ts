@@ -223,7 +223,7 @@ export const generateBaguaPoints = (count: number) => {
 
   // PINKY (Star)
   for (let i = 0; i < count; i++) {
-      let x, y, r, angle;
+      let x = 0, y = 0, r = 0, angle = 0;
       const outerR = 6.0;
       const innerR = 2.5;
       let valid = false;
@@ -244,7 +244,7 @@ export const generateBaguaPoints = (count: number) => {
   
   // VICTORY (Moon)
   for (let i = 0; i < count; i++) {
-      let x, y;
+      let x = 0, y = 0;
       let valid = false;
       while(!valid) {
           const angle = Math.random() * Math.PI * 2;
